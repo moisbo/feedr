@@ -195,7 +195,16 @@ nav ul ul li {
 #main {
   margin-top: 65px;
 }
-
+@media (max-width: 730px) {
+  #main {
+    margin-top: 100px;
+  }
+}
+@media (max-width: 454px) {
+  #main {
+    margin-top: 150px;
+  }
+}
 /* Individual Article Styling */
 .article {
   border-bottom: 1px solid #ccc;

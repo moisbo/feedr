@@ -11,26 +11,50 @@
   var main = document.querySelector('#main');
   var header = document.querySelector('header');
   var state = {
-    home:{ url: '#'},
-    currentSource: state.menu[0],
+    crossoriginme: 'https://crossorigin.me/',
     menu:[
-      {name: 'Top Reddit', ulr: 'https://www.reddit.com/top.json'},
-      {name:'Source 2', ulr:'#'},
-      {name:'Source 3', ulr:'#'}
+      {id:"0", name: 'Top Reddit', url: 'https://www.reddit.com/top.json', imageFallBack: 'images/article_placeholder_1.jpg'},
+      {id:"1", name: 'Mildly Interesting', url:'https://www.reddit.com/r/mildlyinteresting/hot.json'},
+      {id:"2", name: 'Source 3', url:'#'}
     ],
+    currentSource: null,
     articles:[
       {id:'0', image:'images/article_placeholder_1.jpg', source: '#', title:'Test article title', content:'Lifestyle', number:'526'},
       {id:'1', image:'images/article_placeholder_1.jpg', source: '#', title:'Test article title 2', content:'Lifestyle 2', number:'521'}
     ]
-  }
+  };
 
-  feed(state.currentSource)
-  //renderLoading(state, container)
-
+  ///Init
+  state.currentSource = state.menu[0];
+  feed(state.currentSource);
   renderHeader(state, header);
-  renderMain(state, main);
 
+  ////Actions
+  //Select Source
+  delegate('header', 'click', 'li', (event) => {
+    event.preventDefault();
+    var a = closest(event.target, 'a'); 
+    state.currentSource = state.menu[a.dataset.select];
+    feed(state.currentSource);
+    renderHeader(state, header);
+  });
+  //Close Pop-Up
+  delegate('#main', 'click', '.close-pop-up', (event) => {      
+        event.target.parentNode.remove();
+        renderMain(state, main);  
+  });
+  //Open Pop-Up
+  delegate('#main', 'click', 'article', (event) => {
+      var article = closest(event.target.parentNode, 'article');     
+      renderPopUp(state.articles[article.id], main);   
+  });
+  
   ///////Render
+  function renderError(data, into) {
+    into.innerHTML = `
+    <div id="error" class="loader">${data.message}</div>
+    `
+  }
   function renderLoading(data, into) {
       // TODO: Add the template
       into.innerHTML = `
@@ -42,7 +66,7 @@
       return  `
       <ul>
           ${data.menu.map((item) => {
-            return `<li><a href="${item.url}">${item.name}</a></li>`;
+            return `<li><a data-select="${item.id}" href="#">${item.name}</a></li>`;
           }).join('')}          
       </ul>
       `;
@@ -51,14 +75,14 @@
     function renderHeader(data, into) {
       into.innerHTML = `
       <section class="wrapper">
-        <a href="${data.home.url}"><h1>Feedr</h1></a>
+        <a class="selectSource" data-select=${data.currentSource.id} href="#"><h1>Feedr</h1></a>
         <nav>
           <section id="search">
             <input type="text" name="name" value="">
             <div id="search-icon"><img src="images/search.png" alt="" /></div>
           </section>
           <ul>
-            <li><a href="${data.currentSource.url}">News Source: <span>${data.currentSource.name}</span></a>
+            <li><a class="selectSource" data-select=${data.currentSource.id} href="#">News Source: <span>${data.currentSource.name}</span></a>
               ${renderHeaderMenu(data)}
             </li>
           </ul>
@@ -80,10 +104,10 @@
       return `
       <article class="article" id="${data.id}">
         <section class="featured-image">
-          <img src="${data.image}" alt="" />
+          <img src="${data.image || source.imageFallBack}" alt="" />
         </section>
         <section class="article-content"">
-          <a href="${data.source}"><h3>${data.title}</h3></a>
+          <a href="#"><h3>${data.title}</h3></a>
           <h6>${data.content}</h6>
         </section>
         <section class="impressions">
@@ -101,31 +125,49 @@
         <div class="wrapper">
           <h1>${data.title}</h1>
           <p>
-          ${data.content}
+          ${data.full_content}
           </p>
-          <a href="${data.source}" class="pop-up-action" target="_blank">Read more from source</a>
+          <a href="${data.currentSource}${data.source}" class="pop-up-action" target="_blank">Read more from source</a>
         </div>
       </div>
       `;
     }
-    delegate('#main', 'click', '.close-pop-up', (event) => {      
-        event.target.parentNode.remove();
-        renderMain(state, main);  
-    });
-    delegate('#main', 'click', 'article', (event) => {
-      var article = closest(event.target.parentNode, 'article');     
-      renderPopUp(state.articles[article.id], main);   
-    });
-  //////
-  
+
   //////Fetch
   function feed(source){
-      fetch(source.url)
+    renderLoading(state, main)
+      fetch(state.crossoriginme + source.url)
           .then((response)=>{
               return response.json();
           })
           .then((response)=>{
-              state.articles = response;
+            //debugger
+              var res = [];
+              response.data.children.forEach((r, index)=>{
+              var content, full_content;
+              if(r.data.media && r.data.media.oembed){
+                content = r.data.media.oembed.description || '';
+                full_content = r.data.media.oembed.html || '';
+              }
+                  res.push({
+                    id: index,
+                    number: r.data.score,
+                    title: r.data.title,
+                    url: r.data.permalink,
+                    image: r.data.url,
+                    content: content,
+                    full_content: full_content
+                  });
+                  console.log(state);
+              });
+              state.articles = res;
+              renderMain(state, main);
+          })
+          .catch((error)=>{
+            console.log(error);        
+            var msg = {message:'Cannot fetch from ' + source.name, fullMessage: error}
+            renderError(msg, main);
+            throw new Error(error);
           })
     }
   /////
