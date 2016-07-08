@@ -24,6 +24,7 @@ body {
 .wrapper {
   max-width: 1000px;
   margin: 0 auto;
+  padding: 1em;
 }
 
 #pop-up {
@@ -255,3 +256,4 @@ nav ul ul li {
   text-align: right;
   color: #097FB2;
 }
+

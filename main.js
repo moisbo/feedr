@@ -10,12 +10,18 @@
   var container = document.querySelector('#container');
   var main = document.querySelector('#main');
   var header = document.querySelector('header');
-  var state = {
+  var base = {
     crossoriginme: 'https://crossorigin.me/',
+    url: 'https://www.reddit.com',
+    auth: '/api/v1/authorize',
+    access_token: 'F3tpaWDuvHjXn5xKjFZ_9oSOfms',
+    redirectURL: 'http://localhost:3000/'
+  };
+  var state = {
     menu:[
-      {id:"0", name: 'Top Reddit', url: 'https://www.reddit.com/top.json', imageFallBack: 'images/article_placeholder_1.jpg'},
-      {id:"1", name: 'Mildly Interesting', url:'https://www.reddit.com/r/mildlyinteresting/hot.json'},
-      {id:"2", name: 'Source 3', url:'#'}
+      {id:"0", name: 'Top Reddit', api: '/top.json'},
+      {id:"1", name: 'Mildly Interesting', api: '/r/mildlyinteresting/hot.json'},
+      {id:"2", name: 'Controversial', api: '/controversial.json'}
     ],
     currentSource: null,
     articles:[
@@ -31,7 +37,7 @@
 
   ////Actions
   //Select Source
-  delegate('header', 'click', 'li', (event) => {
+  delegate('header', 'click', '.selectSource', (event) => {
     event.preventDefault();
     var a = closest(event.target, 'a'); 
     state.currentSource = state.menu[a.dataset.select];
@@ -40,15 +46,19 @@
   });
   //Close Pop-Up
   delegate('#main', 'click', '.close-pop-up', (event) => {      
-        event.target.parentNode.remove();
-        renderMain(state, main);  
+        event.stopPropagation();
+        renderMain(state.articles, main);  
   });
   //Open Pop-Up
   delegate('#main', 'click', 'article', (event) => {
-      var article = closest(event.target.parentNode, 'article');     
-      renderPopUp(state.articles[article.id], main);   
+      var article = closest(event.target.parentNode, 'article');       
+      renderPopUp(state.articles[article.dataset.id], main);   
   });
-  
+  //Search
+  delegate('#search', 'click', '#search-icon', (event) => {  
+    var input = document.querySelector('input');
+    search(input.value);   
+  });
   ///////Render
   function renderError(data, into) {
     into.innerHTML = `
@@ -56,7 +66,6 @@
     `
   }
   function renderLoading(data, into) {
-      // TODO: Add the template
       into.innerHTML = `
       <div id="pop-up" class="loader">
       </div>
@@ -66,7 +75,7 @@
       return  `
       <ul>
           ${data.menu.map((item) => {
-            return `<li><a data-select="${item.id}" href="#">${item.name}</a></li>`;
+            return `<li class="selectSource"><a data-select="${item.id}" href="#">${item.name}</a></li>`;
           }).join('')}          
       </ul>
       `;
@@ -75,7 +84,7 @@
     function renderHeader(data, into) {
       into.innerHTML = `
       <section class="wrapper">
-        <a class="selectSource" data-select=${data.currentSource.id} href="#"><h1>Feedr</h1></a>
+        <a class="selectSource" data-select=0 href="#"><h1>Feedr</h1></a>
         <nav>
           <section id="search">
             <input type="text" name="name" value="">
@@ -94,21 +103,24 @@
 
     function renderMain(data, into) {
       into.innerHTML = `
-      ${data.articles.map((article)=>{
+      ${data.map((article)=>{
         return renderArticle(article)
       }).join('')}
       `;    
     }
 
     function renderArticle(data) {
+      if(!data.thumbnail.match(/(.jpg)|(.png)|(.jpeg)|(.gif)/)){
+        data.thumbnail = `images/reddit.png`;
+      }
       return `
-      <article class="article" id="${data.id}">
+      <article class="article" data-id=${data.id} >
         <section class="featured-image">
-          <img src="${data.image || source.imageFallBack}" alt="" />
+          <img src="${data.thumbnail}" alt="" />
         </section>
         <section class="article-content"">
           <a href="#"><h3>${data.title}</h3></a>
-          <h6>${data.content}</h6>
+          <h6>${data.author}</h6>
         </section>
         <section class="impressions">
           ${data.number}
@@ -118,16 +130,23 @@
       `;
     }
 
-    function renderPopUp(data, into) {
+    function renderPopUp(data, into) {   
+      var imgv;  
+      if(data.content.match(/(.gifv)/)){
+        //iframe to allow gifv videos
+        imgv = `<iframe src="${data.content}" frameborder="0" scrolling="no" width="300"></iframe>`;
+      }else if(data.thumbnail.match(/(.jpg)|(.png)|(.jpeg)|(.gif)/)){
+        imgv = `<img src="${data.thumbnail}"/>`;
+      }else{
+        imgv = data.thumbnail;
+      }
       into.innerHTML = `
       <div id="pop-up">
         <a href="#" class="close-pop-up">X</a>
         <div class="wrapper">
           <h1>${data.title}</h1>
-          <p>
-          ${data.full_content}
-          </p>
-          <a href="${data.currentSource}${data.source}" class="pop-up-action" target="_blank">Read more from source</a>
+          <p>${imgv}</p>
+          <a href="${base.url}${data.url}" class="pop-up-action" target="_blank">Read more from source</a>
         </div>
       </div>
       `;
@@ -135,40 +154,50 @@
 
   //////Fetch
   function feed(source){
-    renderLoading(state, main)
-      fetch(state.crossoriginme + source.url)
-          .then((response)=>{
-              return response.json();
-          })
-          .then((response)=>{
-            //debugger
-              var res = [];
-              response.data.children.forEach((r, index)=>{
-              var content, full_content;
-              if(r.data.media && r.data.media.oembed){
-                content = r.data.media.oembed.description || '';
-                full_content = r.data.media.oembed.html || '';
-              }
-                  res.push({
-                    id: index,
-                    number: r.data.score,
-                    title: r.data.title,
-                    url: r.data.permalink,
-                    image: r.data.url,
-                    content: content,
-                    full_content: full_content
-                  });
-                  console.log(state);
-              });
-              state.articles = res;
-              renderMain(state, main);
-          })
-          .catch((error)=>{
-            console.log(error);        
-            var msg = {message:'Cannot fetch from ' + source.name, fullMessage: error}
-            renderError(msg, main);
-            throw new Error(error);
-          })
-    }
+    renderLoading(state, main);
+    var fetchURL = base.crossoriginme + base.url + source.api + '?access_token='
+         + base.access_token + '&redirect_uri=' + base.redirectURL + 'duration=3600&scope=*&limit=20';
+    //console.log(fetchURL);
+    fetch(fetchURL)
+    .then((response)=>{
+      return response.json();
+    })
+    .then((response)=>{
+      //debugger
+      var res = [];
+      response.data.children.forEach((r, index) => {
+          res.push({
+            id: index,
+            number: r.data.score,
+            title: r.data.title,
+            author: r.data.author,
+            url: r.data.permalink,
+            thumbnail: r.data.thumbnail,
+            content: r.data.url
+          });                  
+      });
+      state.articles = res;
+      renderMain(state.articles, main);
+    })
+    .catch((error) => {
+      console.log(error);        
+      var msg = {message:'Cannot fetch from ' + source.name, fullMessage: error}
+      renderError(msg, main);
+      throw new Error(error);
+    });      
+  }    
   /////
+
+  ////Search
+  function search(query) {
+    if(query != ''){
+      var articles = state.articles.filter((article)=>{
+        return article.title.match(query)
+      });
+      renderMain(articles, main);
+    }else{
+      renderMain(state.articles, main);
+    }
+  }
+  ////
 })()
