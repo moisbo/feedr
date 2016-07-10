@@ -26,10 +26,7 @@
       {id:"2", name: 'Controversial', api: '/controversial.json'}
     ],
     currentSource: null,
-    articles:[
-      {id:'0', image:'images/article_placeholder_1.jpg', source: '#', title:'Test article title', content:'Lifestyle', number:'526'},
-      {id:'1', image:'images/article_placeholder_1.jpg', source: '#', title:'Test article title 2', content:'Lifestyle 2', number:'521'}
-    ]
+    articles:[]
   };
 
   ///Init
@@ -62,6 +59,11 @@
     var input = document.querySelector('input');
     search(input.value);   
   });
+  delegate('#search', 'change', 'input', (event) => {  
+    console.log(event.target);
+    var input = event.target;
+    search(input.value);   
+  });
   ///////Render
   function renderError(data, into) {
     into.innerHTML = `
@@ -90,7 +92,7 @@
         <a class="selectSource" data-select=0 href="#"><h1>Feedr</h1></a>
         <nav>
           <section id="search">
-            <input type="text" name="name" value="">
+            <input type="text" name="name" value="" placeHolder="Filter">
             <div id="search-icon"><img src="images/search.png" alt="" /></div>
           </section>
           <ul>
@@ -157,16 +159,16 @@
 
   //////Fetch
   function feed(source){
-    renderLoading(state, main);
+    renderLoading(state, popUpWrapper);
     var fetchURL = base.crossoriginme + base.url + source.api + '?access_token='
          + base.access_token + '&redirect_uri=' + base.redirectURL + 'duration=3600&scope=*&limit=20';
-    //console.log(fetchURL);
     fetch(fetchURL)
     .then((response)=>{
       return response.json();
     })
     .then((response)=>{
-      //debugger
+      //remove Loading 
+      document.querySelector('.loader').remove();
       var res = [];
       response.data.children.forEach((r, index) => {
           res.push({
@@ -183,6 +185,7 @@
       renderMain(state.articles, main);
     })
     .catch((error) => {
+      document.querySelector('.loader').remove();
       console.log(error);        
       var msg = {message:'Cannot fetch from ' + source.name, fullMessage: error}
       renderError(msg, main);
@@ -195,7 +198,7 @@
   function search(query) {
     if(query != ''){
       var articles = state.articles.filter((article)=>{
-        return article.title.match(query)
+        return article.title.toLowerCase().match(query.toLowerCase())
       });
       renderMain(articles, main);
     }else{
