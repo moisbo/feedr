@@ -10,6 +10,8 @@
   var container = document.querySelector('#container');
   var main = document.querySelector('#main');
   var header = document.querySelector('header');
+  var popUpWrapper = document.querySelector('#pop-up-wrapper');
+
   var base = {
     crossoriginme: 'https://crossorigin.me/',
     url: 'https://www.reddit.com',
@@ -45,14 +47,15 @@
     renderHeader(state, header);
   });
   //Close Pop-Up
-  delegate('#main', 'click', '.close-pop-up', (event) => {      
-        event.stopPropagation();
-        renderMain(state.articles, main);  
+  delegate('#pop-up-wrapper', 'click', '.close-pop-up', (event) => {      
+    event.target.parentNode.remove();
+    //is this next line needed?
+    event.stopPropagation();      
   });
   //Open Pop-Up
   delegate('#main', 'click', 'article', (event) => {
       var article = closest(event.target.parentNode, 'article');       
-      renderPopUp(state.articles[article.dataset.id], main);   
+      renderPopUp(state.articles[article.dataset.id], popUpWrapper);   
   });
   //Search
   delegate('#search', 'click', '#search-icon', (event) => {  
